@@ -44,6 +44,9 @@ Runde 4-8 (rød): Fm hele veien rundt. Til sammen 18 fm.
 ### Under hekling
 - **Tell** – trykk hvor som helst på det store feltet for neste maske / +1.
   «− 1» retter opp bomtelling.
+- **Bekreftelse på trykk** – hvert trykk gir en kort klikk-lyd + en synlig puls,
+  så du vet at det registrerte uten å se på skjermen. Slå lyden av/på med
+  🔊-knappen øverst. (iPhone støtter ikke vibrasjon fra nettsider, derfor lyd.)
 - **Neste runde** – trykk «Ferdig med runden» eller pilene for å bla mellom runder.
 - **Gjentakelse** – «↻ Gjenta samme runde» lager flere like runder på én gang.
 - Alt lagres automatisk på telefonen/maskinen din.
