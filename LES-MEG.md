@@ -10,15 +10,24 @@ også uten nett.
 
 ### Lim inn hele oppskriften på én gang
 Trykk **«📋 Lim inn hele oppskriften»** i redigering, og lim inn hele oppskriften
-med én runde per linje. Appen lager alle rundene automatisk. Den forstår:
-- Runde-etiketter: `R1:`, `Runde 3`, `Rad 5` – og områder som `R4-8` (lager 5 runder)
-- Maskeantall i parentes: `R2: 6 øk (12)`
-- «fm i hver maske»-runder – antallet arves fra runden før
+med én runde per linje. Appen lager alle rundene automatisk. Den forstår både
+kompakt notasjon og vanlig norsk prosa, blant annet:
+- Runde-etiketter og områder: `R1:`, `Runde 3`, `Runde 6-7` (lager 2 runder)
+- Farge i parentes: `Runde 1 (rød):` – vises som farge på runden
+- Økninger skrevet på ulike måter: `øk`, `2 Fm (øke)`, `2 fm i hver maske`
+- Gjentakelse: `*3 fm, øk* x6`, `(3 fm, øk) x6`, eller «Repeter 10 ganger»
+- Fasit-antall: `Til sammen 40 Fm`, `(12)`, `= 18`, `70 masker hver runde`
+- «Fm hele veien rundt» / «fm i hver maske» – antallet arves fra runden før
+- Fargebytte-notater («…endrer du farge til hvit») festes til riktig runde
+  og vises stort når du kommer dit 📌
+
+Appen **sammenligner** utregnet antall mot oppskriftens «Til sammen»-tall og
+**flagger avvik** i forhåndsvisningen, så du kan rette dem før du legger til.
 ```
-R1: 6 fm i magisk ring
-R2: 6 øk (12)
-R3: *1 fm, øk* x6 (18)
-R4-8: 1 fm i hver maske
+Runde 1 (rød): Start med magisk ring, 6 fm.
+Runde 2 (rød): 2 fm i hver maske. Til sammen 12 fm.
+Runde 3 (rød): Fm, 2 fm (øke). Repeter 6 ganger. Til sammen 18 fm.
+Runde 4-8 (rød): Fm hele veien rundt. Til sammen 18 fm.
 ```
 
 ### To måter å legge inn én runde på

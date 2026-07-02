@@ -56,6 +56,9 @@
     padding:14px 16px; margin-bottom:12px; }
   .roundline .lbl{ font-size:13px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
   .roundline .txt{ font-size:19px; font-weight:600; margin-top:4px; line-height:1.35; }
+  .roundline .rnote{ font-size:14px; color:var(--accent); font-weight:600; margin-top:8px; line-height:1.35; }
+  .cdot{ display:inline-block; width:12px; height:12px; border-radius:50%;
+    border:1px solid rgba(0,0,0,.25); vertical-align:middle; }
   .roundnav{ display:flex; align-items:center; gap:10px; margin-top:12px; }
   .roundnav .pos{ flex:1; text-align:center; font-size:14px; color:var(--muted); }
 
@@ -193,6 +196,8 @@ function parseSeq(s){
       for(let k=0;k<rep;k++) steps = steps.concat(inner);
       continue;
     }
+    // "2 fm (øke)" / "fm (øk)" = én økning, ikke to fastmasker
+    if(/øk|øke/i.test(part) && /fm/i.test(part)){ steps.push(STITCH_BASE.ok); continue; }
     const m = part.match(/^(\d+)?\s*x?\s*(.+)$/);
     if(!m) continue;
     const cnt = m[1]?parseInt(m[1]):1;
@@ -229,65 +234,138 @@ function previewText(res){
   return shown + "  —  " + extra;
 }
 
-/* ---------- Lim inn hel oppskrift ---------- */
-// Tolker én linje til en runde-mal + hvor mange runder den gjelder for.
+/* ---------- Lim inn hel oppskrift (prosa-tolker) ---------- */
+const COLOR_HEX = { "rød":"#d94141","rod":"#d94141","hvit":"#f4f4f4","hvitt":"#f4f4f4",
+  "blå":"#3c7fd6","bla":"#3c7fd6","grønn":"#3aa35a","gronn":"#3aa35a","gul":"#e6c200",
+  "svart":"#333333","oransje":"#e8862e","rosa":"#e58fb0","lilla":"#9b6bcc","brun":"#8a5a3c",
+  "beige":"#d9c7a3","grå":"#9aa0a6","gra":"#9aa0a6","turkis":"#3bb6ad" };
+
+// Kjør-lengde-beskrivelse av en maske-sekvens, f.eks. [fm,fm,fm,øk] → "3 fm, øk"
+function describeSteps(steps){
+  const out=[]; let i=0;
+  while(i<steps.length){
+    let j=i; while(j<steps.length && steps[j].label===steps[i].label) j++;
+    const n=j-i, lab=steps[i].label.toLowerCase();
+    out.push(n>1 ? (n+" "+lab) : lab); i=j;
+  }
+  return out.join(", ");
+}
+// Tolk ett komma-ledd til en maske ("2 Fm (øke)"→øk, "3 fm"→3×fm, "fell"→fell).
+function segStitch(seg){
+  const s = seg.toLowerCase();
+  if(!/[a-zæøå]/.test(s)) return null;
+  if(/øk|øke|øker|økning/.test(s)){
+    const om = s.match(/(\d+)\s*øk/);            // "6 øk" = 6 økninger, "2 fm (øke)" = 1
+    return { st: STITCH_BASE.ok, n: om ? parseInt(om[1]) : 1 };
+  }
+  if(/fell|felling|sammen|smk/.test(s)){
+    const dm = s.match(/(\d+)\s*(?:fell|smk|masker sammen)/);
+    return { st: STITCH_BASE.fell, n: dm ? parseInt(dm[1]) : 1 };
+  }
+  const mm = s.match(/(\d+)?\s*\b(fm|hst|dst|st|kjm|km|lm)\b/);
+  if(mm) return { st: STITCH_BASE[mm[2]==="km"?"kjm":mm[2]], n: mm[1]?parseInt(mm[1]):1 };
+  return null;
+}
+function colorChangeNote(s){
+  const cm = s.match(/(?:endrer du farge til|bytt(?:er)?\s+(?:til\s+)?farge til|skift(?:er)?\s+til|bytt til)\s+([a-zæøå]+)/i);
+  return cm ? ("Bytt farge til " + cm[1].toLowerCase() + " i siste maske") : "";
+}
+
+// Tolker én linje → { kind:'round'|'note'|'skip', ... }
 function parseRoundLine(raw, carry){
   let line = (raw||"").trim();
-  if(!line) return null;
-  let times = 1;
-  // Runde-etikett: "R1", "Runde 4-8", "Rad 3:", "Omgang 2." osv.
-  let m = line.match(/^(?:runde|rnd|omgang|omg|row|rad|r)\.?\s*(\d+)\s*(?:[-–—]\s*(\d+))?\s*[:.)\-]?\s*/i);
+  if(!line) return {kind:"skip"};
+
+  // 1. Runde-etikett, evt. område og farge: "Runde 6-7 (rød):"
+  let times = 1, color = "";
+  let m = line.match(/^(?:runde|rnd|omgang|omg|row|rad|r)\.?\s*(\d+)\s*(?:[-–—]\s*(\d+))?\s*(?:\(([^)]*)\))?\s*[:.]\s*/i);
+  if(!m) m = line.match(/^(\d+)\s*(?:[-–—]\s*(\d+))?\s*(?:\(([^)]*)\))?\s*[:.]\s+/);
   if(m){
     if(m[2]) times = Math.max(1, parseInt(m[2]) - parseInt(m[1]) + 1);
+    if(m[3]) color = m[3].trim().toLowerCase();
     line = line.slice(m[0].length);
   } else {
-    // Bare tall + skilletegn: "1: ...", "3) ..."
-    m = line.match(/^(\d+)\s*(?:[-–—]\s*(\d+))?\s*[:.)]\s*/);
-    if(m){
-      if(m[2]) times = Math.max(1, parseInt(m[2]) - parseInt(m[1]) + 1);
-      line = line.slice(m[0].length);
+    if(/^\(.*\)\.?$/.test(line)) return {kind:"skip"};        // ren parentes-kommentar
+    return {kind:"note", note: colorChangeNote(line) || line.replace(/\s+/g," ").trim()};
+  }
+
+  // 2. Fargebytte-notat inne i linja, deretter fjern den setningen
+  let note = colorChangeNote(line);
+  line = line.replace(/i den siste masken[\s\S]*$/i, " ").trim();
+
+  // 3. Fasit-antall ("Til sammen N", "skal ha N", "N fm hver runde")
+  let annTotal = 0;
+  const tm = line.match(/(?:til\s*sammen|tilsammen)\s*(\d+)/i) ||
+             line.match(/skal ha\s*(\d+)/i) ||
+             line.match(/(\d+)\s*(?:fm|masker)\s*(?:hver|begge|per|etter)/i) ||
+             line.match(/[=]\s*(\d+)/);
+  if(tm) annTotal = parseInt(tm[1]);
+
+  // 4. Gjentakelse ("Repeter 10 ganger")
+  let repN = 0;
+  const rm = line.match(/(?:repeter|repeater|gjenta|gjentas)\b[^.\d]*(\d+)/i);
+  if(rm) repN = parseInt(rm[1]);
+
+  // 5. Isoler selve maske-instruksjonen (før "repeter/til sammen/skal ha")
+  let instr = line.split(/\b(?:repeter|repeater|gjenta|gjentas|til\s*sammen|tilsammen|denne skal|skal ha)\b/i)[0].trim();
+  const low = instr.toLowerCase();
+  const incCue = /(øk|øke|øker|økning)/.test(low) || /2\s*fm/.test(low);
+  const fillCue = /(hele veien|rundt hele|hele omgangen|hver maske|\brundt\b)/.test(low);
+
+  let steps = [], base = [], reps = 0;
+  if(fillCue && incCue){                       // "2 fm i hver maske" = øk i hver
+    const inc = carry || (annTotal ? Math.round(annTotal/2) : 0);
+    for(let k=0;k<inc;k++) steps.push(STITCH_BASE.ok);
+  } else if(fillCue){                          // "fm hele veien rundt"
+    const cnt = annTotal || carry || 0;
+    for(let k=0;k<cnt;k++) steps.push(STITCH_BASE.fm);
+  } else {                                     // sekvens, delt på komma
+    for(const seg of instr.split(",")){
+      const r = segStitch(seg);
+      if(r) for(let k=0;k<r.n;k++) base.push(r.st);
+    }
+    if(base.length){
+      reps = repN;
+      if(!reps){
+        const prod = base.reduce((a,s)=>a+s.produces,0);
+        reps = (annTotal>prod && prod>0 && annTotal%prod===0) ? annTotal/prod : 1; // utled fra fasit
+      }
+      for(let k=0;k<reps;k++) steps = steps.concat(base);
+    } else if(annTotal>0){
+      for(let k=0;k<annTotal;k++) steps.push(STITCH_BASE.fm);  // ukjent, men vet totalen
     }
   }
-  // Maske-antall bakerst: "(18)" eller "= 18"
-  let annTotal = 0;
-  const ann = line.match(/[=(]\s*(\d+)\s*\)?\s*$/);
-  if(ann){ annTotal = parseInt(ann[1]); line = line.slice(0, ann.index).trim(); }
-  const text = line.trim();
-  if(!text) return null;
 
-  const res = parsePattern(text);
-  // "fm i hver maske" o.l. – antall arves fra forrige runde eller fra (N)
-  const isFill = /(hver|hele|alle|rundt|around|each)/i.test(text) &&
-                 (!res || res.steps.every(s=>s.kind===""));
-  let round = { text:"", seq:"", steps:[], rep:0, repSize:0, total:0, target:0 };
-  let total = 0;
-  if(isFill){
-    const count = annTotal || carry || 0;
-    round.seq = text;
-    if(count>0){
-      round.steps = Array.from({length:count}, ()=>STITCH_BASE.fm);
-      round.total = count; round.target = count; total = count;
-    } else { round.text = text; round.target = annTotal; total = annTotal; }
-  } else if(res){
-    round.seq = text; round.steps = res.steps; round.rep = res.rep;
-    round.repSize = res.repSize; round.total = res.total; round.target = res.total;
-    total = res.total;
+  const total = steps.reduce((a,s)=>a+s.produces,0);
+  const round = { id:"", text:"", seq:"", steps:[], rep:0, repSize:0, total:0, target:0, note, color };
+  if(steps.length){
+    round.steps = steps; round.total = total; round.target = total;
+    round.text = instr;                        // behold original beskrivelse
+    if(reps>1){ round.rep = reps; round.repSize = base.length; round.seq = "("+describeSteps(base)+") x"+reps; }
+    else round.seq = describeSteps(steps);      // kanonisk, redigerbar form
   } else {
-    round.text = text; round.target = annTotal; total = annTotal;
+    round.text = instr || line.trim(); round.target = annTotal;
   }
-  return { round, times, total };
+  const warn = annTotal>0 && total>0 && total!==annTotal;
+  return { kind:"round", round, times, total: total||annTotal, warn, annTotal };
 }
-// Tolker en hel oppskrift (flere linjer) til en liste runder.
+
+// Tolker en hel oppskrift (flere linjer) → liste runder. Notat-linjer festes til forrige runde.
 function parseWholePattern(text){
   const rounds = [];
   let carry = 0;
   for(const raw of (text||"").split(/\r?\n/)){
-    const parsed = parseRoundLine(raw, carry);
-    if(!parsed) continue;
-    for(let k=0;k<parsed.times;k++){
-      rounds.push(Object.assign({id:uid()}, parsed.round, {steps: parsed.round.steps.slice()}));
+    const p = parseRoundLine(raw, carry);
+    if(!p || p.kind==="skip") continue;
+    if(p.kind==="note"){
+      if(p.note && rounds.length){ const last = rounds[rounds.length-1];
+        last.note = last.note ? (last.note + " · " + p.note) : p.note; }
+      continue;
     }
-    if(parsed.total>0) carry = parsed.total;
+    for(let k=0;k<p.times;k++){
+      rounds.push(Object.assign({}, p.round, {id:uid(), steps:p.round.steps.slice(), _warn:p.warn, _ann:p.annTotal}));
+    }
+    if(p.total>0) carry = p.total;
   }
   return rounds;
 }
@@ -381,6 +459,7 @@ function renderCounter(app){
   const rl = el(`<div class="roundline">
     <div class="lbl">Denne runden</div>
     <div class="txt"></div>
+    <div class="rnote"></div>
     <div class="roundnav">
       <button class="icon-btn prev">‹</button>
       <div class="pos"></div>
@@ -388,6 +467,14 @@ function renderCounter(app){
     </div>
   </div>`);
   rl.querySelector(".txt").textContent = round ? (round.text || round.seq || "Runde " + (p.currentRound+1)) : "Ingen runder lagt inn — trykk ✎ for å legge til.";
+  if(round && round.color){
+    const dot = COLOR_HEX[round.color] || "#bbb";
+    rl.querySelector(".lbl").innerHTML =
+      'Denne runden &nbsp;·&nbsp; <span class="cdot" style="background:'+dot+'"></span> ' + round.color;
+  }
+  const noteEl = rl.querySelector(".rnote");
+  if(round && round.note){ noteEl.textContent = "📌 " + round.note; }
+  else noteEl.style.display = "none";
   rl.querySelector(".pos").textContent = total ? `Runde ${p.currentRound+1} av ${total}` : "—";
   rl.querySelector(".prev").onclick = ()=>changeRound(-1);
   rl.querySelector(".next").onclick = ()=>changeRound(1);
@@ -625,13 +712,21 @@ function pastePatternModal(p){
       prev.className="pastePrev"; prev.textContent = ta.value.trim()? "Fant ingen runder ennå …" : "";
       ok.disabled = true; return;
     }
-    const lines = parsed.slice(0,10).map((r,i)=>{
-      const d = r.text || r.seq || "runde";
-      return `R${i+1}: ${d}${r.total?(" — "+r.total+" m"):""}`;
+    const esc = s => (s||"").replace(/[<>&]/g, c=>({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]));
+    let warns = 0;
+    const lines = parsed.slice(0,14).map((r,i)=>{
+      const d = esc(r.text || r.seq || "runde");
+      const col = r.color ? `<span class="cdot" style="background:${COLOR_HEX[r.color]||"#bbb"}"></span> ` : "";
+      const m = r.total ? ` — ${r.total} m` : "";
+      let w = "";
+      if(r._warn){ warns++; w = ` <span style="color:#d98029">⚠︎ oppgitt ${r._ann}</span>`; }
+      const note = r.note ? `<br><span style="color:var(--accent)">📌 ${esc(r.note)}</span>` : "";
+      return `${col}<b>R${i+1}</b>: ${d}${m}${w}${note}`;
     });
-    if(parsed.length>10) lines.push("…");
+    if(parsed.length>14) lines.push("…");
     prev.className="pastePrev filled";
-    prev.innerHTML = `<b>Fant ${parsed.length} runde(r):</b><br>` + lines.join("<br>");
+    const warnLine = warns ? `<br><span style="color:#d98029">⚠︎ ${warns} runde(r) stemmer ikke med oppgitt antall – sjekk dem etterpå.</span>` : "";
+    prev.innerHTML = `<b>Fant ${parsed.length} runde(r):</b><br>` + lines.join("<br>") + warnLine;
     ok.disabled = false;
   }
   ta.oninput = refresh;
