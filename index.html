@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Hekle">
+<meta name="theme-color" content="#c66b7e">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>Hekle</title>
+<style>
+  :root{
+    --bg:#fbf6f2; --card:#ffffff; --ink:#3a2e2e; --muted:#9a8a86;
+    --accent:#c66b7e; --accent-dark:#a94f63; --line:#efe6e0;
+    --good:#5aa469; --safe-top:env(safe-area-inset-top);
+    --safe-bottom:env(safe-area-inset-bottom);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#221c1d; --card:#2e2626; --ink:#f3eae7; --muted:#a89792;
+           --line:#3d3232; }
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ margin:0; height:100%; }
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:var(--bg); color:var(--ink);
+    -webkit-user-select:none; user-select:none;
+    overscroll-behavior:none;
+  }
+  #app{ min-height:100%; padding:calc(var(--safe-top) + 8px) 16px calc(var(--safe-bottom) + 16px); max-width:600px; margin:0 auto; }
+  h1,h2{ font-weight:700; }
+  button{ font-family:inherit; cursor:pointer; border:none; }
+  .topbar{ display:flex; align-items:center; gap:10px; margin-bottom:14px; min-height:38px; }
+  .topbar h1{ font-size:22px; margin:0; flex:1; }
+  .icon-btn{ background:var(--card); color:var(--ink); border:1px solid var(--line);
+    border-radius:12px; width:40px; height:40px; font-size:19px; display:flex;
+    align-items:center; justify-content:center; }
+  .btn{ background:var(--accent); color:#fff; border-radius:14px; padding:14px 18px;
+    font-size:17px; font-weight:600; width:100%; }
+  .btn:active{ background:var(--accent-dark); }
+  .btn.ghost{ background:var(--card); color:var(--ink); border:1px solid var(--line); }
+  .btn.small{ width:auto; padding:10px 14px; font-size:15px; }
+
+  /* Project list */
+  .proj{ background:var(--card); border:1px solid var(--line); border-radius:16px;
+    padding:16px; margin-bottom:12px; display:flex; align-items:center; gap:12px; }
+  .proj .info{ flex:1; }
+  .proj .name{ font-size:18px; font-weight:600; }
+  .proj .sub{ font-size:13px; color:var(--muted); margin-top:3px; }
+  .empty{ text-align:center; color:var(--muted); margin:50px 16px; line-height:1.5; }
+
+  /* Counter view */
+  .roundline{ background:var(--card); border:1px solid var(--line); border-radius:16px;
+    padding:14px 16px; margin-bottom:12px; }
+  .roundline .lbl{ font-size:13px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
+  .roundline .txt{ font-size:19px; font-weight:600; margin-top:4px; line-height:1.35; }
+  .roundnav{ display:flex; align-items:center; gap:10px; margin-top:12px; }
+  .roundnav .pos{ flex:1; text-align:center; font-size:14px; color:var(--muted); }
+
+  .counter{ background:var(--card); border:1px solid var(--line); border-radius:20px;
+    padding:22px 16px; text-align:center; position:relative; overflow:hidden;
+    -webkit-user-select:none; }
+  .counter.tapzone:active{ background:var(--line); }
+  .count-num{ font-size:88px; font-weight:800; line-height:1; letter-spacing:-2px; }
+  .count-target{ font-size:22px; color:var(--muted); margin-top:6px; height:26px; }
+  .count-hint{ font-size:13px; color:var(--muted); margin-top:10px; }
+  .progress{ height:8px; background:var(--line); border-radius:6px; margin-top:16px; overflow:hidden; }
+  .progress > div{ height:100%; background:var(--accent); width:0%; transition:width .18s; }
+  .counter.done .progress > div{ background:var(--good); }
+  .counter.done .count-num{ color:var(--good); }
+  /* Steg-for-steg */
+  .counter .step-pos{ font-size:14px; color:var(--muted); }
+  .counter .badge{ display:inline-block; font-size:12px; font-weight:700; letter-spacing:.5px;
+    padding:5px 12px; border-radius:999px; background:var(--line); color:var(--muted); margin:10px 0 2px; }
+  .counter .stitch{ font-size:72px; font-weight:800; line-height:1.05; margin:6px 0 2px; color:var(--ink); }
+  .counter .stitch-sub{ font-size:18px; color:var(--muted); min-height:22px; }
+  .counter .next-hint{ font-size:14px; color:var(--muted); margin-top:10px; }
+  .counter.inc .stitch{ color:var(--accent); }
+  .counter.inc .badge{ background:var(--accent); color:#fff; }
+  .counter.inc .progress > div{ background:var(--accent); }
+  .counter.dec .stitch{ color:#3c8dbf; }
+  .counter.dec .badge{ background:#3c8dbf; color:#fff; }
+  .counter.dec .progress > div{ background:#3c8dbf; }
+
+  .controls{ display:flex; gap:10px; margin-top:12px; }
+  .controls .btn{ flex:1; }
+  .bigplus{ margin-top:12px; }
+
+  /* Editor rows */
+  .editrow{ background:var(--card); border:1px solid var(--line); border-radius:14px;
+    padding:12px; margin-bottom:10px; display:flex; gap:10px; align-items:flex-start; }
+  .editrow .num{ font-size:13px; color:var(--muted); width:58px; flex-shrink:0; padding-top:12px; }
+  .editrow input{ font-family:inherit; font-size:16px; background:var(--bg);
+    border:1px solid var(--line); color:var(--ink); border-radius:10px; padding:11px; width:100%; }
+  .editrow .fields{ flex:1; display:flex; flex-direction:column; gap:8px; }
+  .editrow .fields .target{ width:110px; }
+  .editrow .del{ background:none; color:var(--muted); font-size:20px; padding:6px; align-self:center; }
+  .hint{ font-size:13px; color:var(--muted); line-height:1.5; margin:6px 2px 16px; }
+  .hint code{ background:var(--line); padding:1px 5px; border-radius:5px; font-size:12px; }
+  .rprev{ font-size:13px; color:var(--muted); line-height:1.4; padding:2px 2px; min-height:2px; }
+  .rprev.ok{ color:var(--good); }
+  .editrow input:disabled{ opacity:.55; }
+
+  /* Modal */
+  .modal-bg{ position:fixed; inset:0; background:rgba(0,0,0,.4); display:flex;
+    align-items:flex-end; justify-content:center; z-index:50; }
+  .modal{ background:var(--card); border-radius:20px 20px 0 0; padding:20px 18px calc(var(--safe-bottom) + 20px);
+    width:100%; max-width:600px; }
+  .modal h2{ margin:0 0 14px; font-size:20px; }
+  .modal label{ display:block; font-size:14px; color:var(--muted); margin:12px 0 5px; }
+  .modal input{ font-family:inherit; font-size:17px; width:100%; background:var(--bg);
+    border:1px solid var(--line); color:var(--ink); border-radius:12px; padding:13px; }
+  .modal .row{ display:flex; gap:10px; margin-top:18px; }
+  .modal .row .btn{ flex:1; }
+
+  .flash{ position:fixed; top:calc(var(--safe-top) + 12px); left:50%; transform:translateX(-50%);
+    background:var(--good); color:#fff; padding:12px 20px; border-radius:14px; font-weight:600;
+    z-index:80; box-shadow:0 6px 20px rgba(0,0,0,.2); }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+"use strict";
+
+/* ---------- Lagring ---------- */
+const KEY = "hekleapp.v1";
+let state = load();
+
+function load(){
+  try{ const d = JSON.parse(localStorage.getItem(KEY)); if(d && d.projects) return d; }catch(e){}
+  return { projects:[], view:{page:"list"} };
+}
+function save(){ localStorage.setItem(KEY, JSON.stringify(state)); }
+function uid(){ return Math.random().toString(36).slice(2,9); }
+
+/* ---------- Hjelpere ---------- */
+function currentProject(){ return state.projects.find(p=>p.id===state.view.projectId); }
+function flash(msg){
+  const el = document.createElement("div");
+  el.className="flash"; el.textContent=msg; document.body.appendChild(el);
+  setTimeout(()=>el.remove(), 1600);
+}
+function buzz(){ if(navigator.vibrate) navigator.vibrate(30); }
+
+/* ---------- Oppskrift-tolker (steg-for-steg) ---------- */
+const STITCH_BASE = {
+  fm:{label:"FM", sub:"fastmaske", produces:1, kind:""},
+  lm:{label:"LM", sub:"luftmaske", produces:1, kind:""},
+  kjm:{label:"KJM", sub:"kjedemaske", produces:1, kind:""},
+  hst:{label:"HST", sub:"halvstav", produces:1, kind:""},
+  st:{label:"ST", sub:"stav", produces:1, kind:""},
+  dst:{label:"DST", sub:"dobbeltstav", produces:1, kind:""},
+  ok:{label:"ØK", sub:"2 fm i samme maske", produces:2, kind:"inc"},
+  fell:{label:"FELL", sub:"2 masker sammen", produces:1, kind:"dec"}
+};
+function lookupStitch(name){
+  name = name.trim().toLowerCase().replace(/\./g,"");
+  if(!name) return null;
+  if(name.startsWith("øk")||name.startsWith("ok")||name.includes("i samme")) return STITCH_BASE.ok;
+  if(name.startsWith("fell")||name.startsWith("smk")||name.includes("sammen")) return STITCH_BASE.fell;
+  for(const k of ["dst","hst","kjm","km","fm","lm","st"]){
+    if(name.startsWith(k)) return STITCH_BASE[k==="km"?"kjm":k];
+  }
+  return null;
+}
+function tokenizeTop(s){
+  const parts=[]; let depth=0, cur="";
+  for(const ch of s){
+    if(ch==="(") { depth++; cur+=ch; }
+    else if(ch===")"){ depth--; cur+=ch; }
+    else if(ch==="," && depth===0){ parts.push(cur); cur=""; }
+    else cur+=ch;
+  }
+  if(cur.trim()) parts.push(cur);
+  return parts.map(x=>x.trim()).filter(Boolean);
+}
+const GROUP_RE = /^(?:(\d+)\s*x?\s*)?\(([\s\S]*)\)(?:\s*x\s*(\d+))?$/i;
+function parseSeq(s){
+  let steps=[];
+  for(const part of tokenizeTop(s)){
+    const g = part.match(GROUP_RE);
+    if(g){
+      const inner = parseSeq(g[2]);
+      const rep = parseInt(g[1]||g[3]||"1");
+      for(let k=0;k<rep;k++) steps = steps.concat(inner);
+      continue;
+    }
+    const m = part.match(/^(\d+)?\s*x?\s*(.+)$/);
+    if(!m) continue;
+    const cnt = m[1]?parseInt(m[1]):1;
+    const st = lookupStitch(m[2]);
+    if(!st) continue;
+    for(let k=0;k<cnt;k++) steps.push(st);
+  }
+  return steps;
+}
+// Tolker en runde-tekst til enkeltmasker. Returnerer null hvis den ikke kjenner igjen noe.
+function parsePattern(str){
+  if(!str || !str.trim()) return null;
+  let s = str.replace(/×/g,"x");
+  s = s.replace(/\*([^*]*)\*\s*x?\s*(\d+)/gi, "($1) x$2").replace(/\*/g,""); // *...* xN → (...) xN
+  const top = tokenizeTop(s);
+  let rep=0, repSize=0;
+  if(top.length===1){
+    const g = top[0].match(GROUP_RE);
+    if(g && (g[1]||g[3])){ rep=parseInt(g[1]||g[3]); repSize=parseSeq(g[2]).length; }
+  }
+  const steps = parseSeq(s);
+  if(!steps.length) return null;
+  const total = steps.reduce((a,st)=>a+st.produces,0);
+  return { steps, rep, repSize, total };
+}
+function isGuided(r){ return r && r.steps && r.steps.length>0; }
+function roundLen(r){ return isGuided(r) ? r.steps.length : (r.target||0); }
+function previewText(res){
+  const names = res.steps.map(s=>s.label.toLowerCase());
+  let shown = names.slice(0,14).join(", ");
+  if(names.length>14) shown += " …";
+  let extra = res.steps.length + " steg · " + res.total + " masker";
+  if(res.rep>1) extra = res.rep + "× gjentakelse · " + extra;
+  return shown + "  —  " + extra;
+}
+
+/* ---------- Wake lock (hindre at skjermen sovner) ---------- */
+let wakeLock=null;
+async function requestWake(){
+  try{ if("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen"); }catch(e){}
+}
+function releaseWake(){ if(wakeLock){ wakeLock.release(); wakeLock=null; } }
+document.addEventListener("visibilitychange",()=>{
+  if(document.visibilityState==="visible" && state.view.page==="counter") requestWake();
+});
+
+/* ---------- Navigasjon ---------- */
+function go(page, extra={}){
+  state.view = Object.assign({page}, extra);
+  if(page==="counter") requestWake(); else releaseWake();
+  save(); render();
+}
+
+/* ================= RENDER ================= */
+function render(){
+  const app = document.getElementById("app");
+  app.innerHTML="";
+  const page = state.view.page || "list";
+  if(page==="list") renderList(app);
+  else if(page==="counter") renderCounter(app);
+  else if(page==="editor") renderEditor(app);
+}
+
+/* ---------- Prosjektliste ---------- */
+function renderList(app){
+  const bar = el(`<div class="topbar"><h1>Hekleprosjekter</h1></div>`);
+  app.appendChild(bar);
+
+  if(state.projects.length===0){
+    app.appendChild(el(`<div class="empty">Ingen prosjekter enda.<br>Trykk «Nytt prosjekt» for å starte.</div>`));
+  }
+  state.projects.forEach(p=>{
+    const total = p.rounds.length;
+    const pos = Math.min(p.currentRound+1, Math.max(total,1));
+    const sub = total? `Runde ${pos} av ${total}` : "Ingen runder lagt inn";
+    const row = el(`<div class="proj">
+      <div class="info">
+        <div class="name"></div>
+        <div class="sub">${sub}</div>
+      </div>
+      <button class="icon-btn open">›</button>
+    </div>`);
+    row.querySelector(".name").textContent = p.name;
+    row.querySelector(".info").onclick = ()=>go("counter",{projectId:p.id});
+    row.querySelector(".open").onclick = ()=>go("counter",{projectId:p.id});
+    app.appendChild(row);
+  });
+
+  const add = el(`<button class="btn" style="margin-top:8px">+ Nytt prosjekt</button>`);
+  add.onclick = ()=> newProjectModal();
+  app.appendChild(add);
+}
+
+function newProjectModal(){
+  modal("Nytt prosjekt", [{label:"Navn på prosjektet", id:"pname", placeholder:"F.eks. Skjerf, Amigurumi-katt"}],
+    (vals)=>{
+      const name = (vals.pname||"").trim() || "Nytt prosjekt";
+      const p = { id:uid(), name, currentRound:0, count:0, rounds:[] };
+      state.projects.push(p); save();
+      go("counter",{projectId:p.id});
+    });
+}
+
+/* ---------- Teller ---------- */
+function renderCounter(app){
+  const p = currentProject();
+  if(!p){ go("list"); return; }
+
+  const bar = el(`<div class="topbar">
+    <button class="icon-btn back">‹</button>
+    <h1></h1>
+    <button class="icon-btn edit">✎</button>
+  </div>`);
+  bar.querySelector("h1").textContent = p.name;
+  bar.querySelector(".back").onclick = ()=>go("list");
+  bar.querySelector(".edit").onclick = ()=>go("editor",{projectId:p.id});
+  app.appendChild(bar);
+
+  const round = p.rounds[p.currentRound];
+  const total = p.rounds.length;
+
+  // Gjeldende runde-tekst
+  const rl = el(`<div class="roundline">
+    <div class="lbl">Denne runden</div>
+    <div class="txt"></div>
+    <div class="roundnav">
+      <button class="icon-btn prev">‹</button>
+      <div class="pos"></div>
+      <button class="icon-btn next">›</button>
+    </div>
+  </div>`);
+  rl.querySelector(".txt").textContent = round ? (round.text || round.seq || "Runde " + (p.currentRound+1)) : "Ingen runder lagt inn — trykk ✎ for å legge til.";
+  rl.querySelector(".pos").textContent = total ? `Runde ${p.currentRound+1} av ${total}` : "—";
+  rl.querySelector(".prev").onclick = ()=>changeRound(-1);
+  rl.querySelector(".next").onclick = ()=>changeRound(1);
+  app.appendChild(rl);
+
+  let c;
+  if(isGuided(round)){
+    c = buildGuidedCounter(p, round);
+  } else {
+    const target = round && round.target>0 ? round.target : 0;
+    const done = target>0 && p.count>=target;
+    const pct = target>0 ? Math.min(100, Math.round(p.count/target*100)) : 0;
+    c = el(`<div class="counter tapzone ${done?'done':''}">
+      <div class="count-num"></div>
+      <div class="count-target"></div>
+      ${target>0?`<div class="progress"><div style="width:${pct}%"></div></div>`:``}
+      <div class="count-hint">Trykk hvor som helst her for +1</div>
+    </div>`);
+    c.querySelector(".count-num").textContent = p.count;
+    c.querySelector(".count-target").textContent = target>0 ? `av ${target} masker` : "";
+    c.onclick = ()=>tap(1);
+  }
+  app.appendChild(c);
+
+  const ctrls = el(`<div class="controls">
+    <button class="btn ghost minus">− 1</button>
+    <button class="btn ghost reset">Nullstill</button>
+  </div>`);
+  ctrls.querySelector(".minus").onclick = (e)=>{ e.stopPropagation(); step(-1); };
+  ctrls.querySelector(".reset").onclick = (e)=>{ e.stopPropagation(); if(confirm("Nullstille telleren for denne runden?")){ p.count=0; save(); render(); } };
+  app.appendChild(ctrls);
+
+  const nextBtn = el(`<button class="btn bigplus">Ferdig med runden – neste ›</button>`);
+  nextBtn.onclick = ()=>{ changeRound(1, true); };
+  app.appendChild(nextBtn);
+}
+
+// Steg-for-steg-kortet: viser hva neste maske skal være.
+function buildGuidedCounter(p, round){
+  const len = round.steps.length;
+  const doneAll = p.count>=len;
+  const cur = doneAll ? null : round.steps[p.count];
+  const nextS = (p.count+1<len) ? round.steps[p.count+1] : null;
+  const produced = round.steps.slice(0, p.count).reduce((a,s)=>a+s.produces,0);
+  const pct = Math.min(100, Math.round(p.count/len*100));
+  const kind = cur ? cur.kind : "";
+  let repLine = "";
+  if(round.rep>1 && round.repSize>0 && !doneAll){
+    const ri = Math.min(Math.floor(p.count/round.repSize)+1, round.rep);
+    const pos = p.count%round.repSize+1;
+    repLine = ` · gjentakelse ${ri} av ${round.rep} (maske ${pos} av ${round.repSize})`;
+  }
+  const body = doneAll
+    ? `<div class="stitch">🎉</div><div class="stitch-sub">Runden er ferdig – trykk «neste»</div>`
+    : `<div class="badge">${cur.kind==="inc"?"ØKNING":cur.kind==="dec"?"FELLING":"NESTE MASKE"}</div>
+       <div class="stitch">${cur.label}</div>
+       <div class="stitch-sub">${cur.sub}</div>
+       <div class="next-hint">${nextS?("Deretter: "+nextS.label.toLowerCase()):"Siste maske i runden"}</div>`;
+  const c = el(`<div class="counter tapzone ${kind} ${doneAll?"done":""}">
+    <div class="step-pos">${doneAll?"Runde ferdig":("Steg "+(p.count+1)+" av "+len)}${repLine}</div>
+    ${body}
+    <div class="progress"><div style="width:${pct}%"></div></div>
+    <div class="count-hint">${produced} av ${round.total} masker laget</div>
+  </div>`);
+  c.onclick = ()=>step(1);
+  return c;
+}
+
+// +1 / −1 som virker i begge modusene.
+function step(delta){
+  const p = currentProject();
+  const round = p.rounds[p.currentRound];
+  if(isGuided(round)){
+    const len = round.steps.length;
+    const was = p.count>=len;
+    p.count = Math.max(0, Math.min(len, p.count+delta));
+    save(); if(delta>0) buzz();
+    if(!was && p.count>=len){ flash("Runden er ferdig! 🎉"); buzz(); }
+    render();
+  } else {
+    tap(delta);
+  }
+}
+
+function tap(delta){
+  const p = currentProject();
+  p.count = Math.max(0, p.count+delta);
+  save();
+  buzz();
+  const round = p.rounds[p.currentRound];
+  const target = round && round.target>0 ? round.target : 0;
+  // Oppdater kun tallene for rask respons
+  const numEl = document.querySelector(".count-num");
+  const barEl = document.querySelector(".progress > div");
+  const counterEl = document.querySelector(".counter");
+  if(numEl) numEl.textContent = p.count;
+  if(target>0){
+    const pct = Math.min(100, Math.round(p.count/target*100));
+    if(barEl) barEl.style.width = pct+"%";
+    const wasDone = counterEl.classList.contains("done");
+    const nowDone = p.count>=target;
+    counterEl.classList.toggle("done", nowDone);
+    if(nowDone && !wasDone){ flash("Runden er ferdig! 🎉"); buzz(); }
+  }
+}
+
+function changeRound(delta, fromButton){
+  const p = currentProject();
+  const total = p.rounds.length;
+  if(total===0) return;
+  let next = p.currentRound + delta;
+  if(next<0) next=0;
+  if(next>=total){
+    if(fromButton){ flash("Du er ferdig med alle rundene! 🧶"); }
+    next = total-1;
+    if(delta>0 && fromButton){ p.currentRound=next; p.count=0; save(); render(); return; }
+  }
+  p.currentRound = next;
+  p.count = 0;
+  save(); render();
+}
+
+/* ---------- Oppskrift-redigering ---------- */
+function renderEditor(app){
+  const p = currentProject();
+  if(!p){ go("list"); return; }
+
+  const bar = el(`<div class="topbar">
+    <button class="icon-btn back">‹</button>
+    <h1></h1>
+  </div>`);
+  bar.querySelector("h1").textContent = "Oppskrift";
+  bar.querySelector(".back").onclick = ()=>{ if(p.currentRound>=p.rounds.length) p.currentRound=Math.max(0,p.rounds.length-1); save(); go("counter",{projectId:p.id}); };
+  app.appendChild(bar);
+
+  // Rediger navn
+  const nameRow = el(`<div class="editrow"><div class="fields">
+      <label style="font-size:13px;color:var(--muted)">Prosjektnavn</label>
+      <input class="pname" type="text">
+    </div></div>`);
+  const pn = nameRow.querySelector(".pname");
+  pn.value = p.name;
+  pn.onchange = ()=>{ p.name = pn.value.trim()||"Prosjekt"; save(); };
+  app.appendChild(nameRow);
+
+  app.appendChild(el(`<div class="hint">
+    <b>Steg-for-steg</b> (anbefalt): skriv mønsteret så viser telleren hva neste maske skal være.
+    Bruk <code>fm</code>, <code>øk</code> (2 i samme maske), <code>fell</code>, og parenteser med antall.<br>
+    Eksempler: <code>6 fm</code> · <code>3 fm, øk</code> · <code>10x(3 fm, øk)</code> · <code>*1 fm, øk* x6</code>.
+    Maskemålet regnes ut automatisk.<br>
+    Vil du bare telle uten steg-visning? La feltet stå tomt og skriv <b>maskemål</b> selv.
+  </div>`));
+
+  p.rounds.forEach((r, i)=>{
+    const row = el(`<div class="editrow">
+      <div class="num">Runde ${i+1}</div>
+      <div class="fields">
+        <input class="rtext" type="text" placeholder="Kort beskrivelse (valgfritt)">
+        <input class="rseq" type="text" placeholder="Steg-for-steg, f.eks. 3 fm, øk">
+        <div class="rprev"></div>
+        <input class="rtarget target" type="number" inputmode="numeric" placeholder="Maskemål" min="0">
+      </div>
+      <button class="del">🗑</button>
+    </div>`);
+    const t = row.querySelector(".rtext"); t.value=r.text;
+    t.onchange=()=>{ r.text=t.value; save(); };
+
+    const seq = row.querySelector(".rseq");
+    const prev = row.querySelector(".rprev");
+    const tg = row.querySelector(".rtarget");
+    seq.value = r.seq||"";
+    function refreshPrev(){
+      const res = parsePattern(seq.value);
+      if(res){
+        prev.className="rprev ok";
+        prev.textContent = "→ " + previewText(res);
+        tg.value = res.total; tg.disabled = true;
+      } else {
+        prev.className="rprev";
+        prev.textContent = seq.value.trim() ? "Kjente ikke igjen mønsteret – bruk fm, øk, fell, ( ) og x." : "";
+        tg.disabled = false;
+      }
+    }
+    seq.onchange=()=>{
+      const res = parsePattern(seq.value);
+      r.seq = seq.value;
+      if(res){ r.steps=res.steps; r.rep=res.rep; r.repSize=res.repSize; r.total=res.total; r.target=res.total; }
+      else { r.steps=[]; r.rep=0; r.repSize=0; }
+      refreshPrev(); save();
+    };
+    refreshPrev();
+
+    tg.value = r.target||"";
+    tg.onchange=()=>{ if(!isGuided(r)) { r.target = parseInt(tg.value)||0; save(); } };
+    row.querySelector(".del").onclick=()=>{
+      p.rounds.splice(i,1);
+      if(p.currentRound>=p.rounds.length) p.currentRound=Math.max(0,p.rounds.length-1);
+      save(); render();
+    };
+    app.appendChild(row);
+  });
+
+  const addOne = el(`<button class="btn ghost" style="margin-bottom:10px">+ Legg til runde</button>`);
+  addOne.onclick=()=>{ p.rounds.push({id:uid(),text:"",target:0}); save(); render(); };
+  app.appendChild(addOne);
+
+  const addRep = el(`<button class="btn ghost small" style="width:100%">↻ Legg til gjentakelse (samme runde flere ganger)</button>`);
+  addRep.onclick=()=>repeatModal(p);
+  app.appendChild(addRep);
+}
+
+function repeatModal(p){
+  modal("Gjenta samme runde", [
+    {label:"Beskrivelse (valgfritt)", id:"rtext", placeholder:"F.eks. 1 fm i hver maske"},
+    {label:"Steg-for-steg (valgfritt)", id:"rseq", placeholder:"F.eks. 30 fm"},
+    {label:"Maskemål (hvis ikke steg-for-steg)", id:"rtarget", placeholder:"F.eks. 30", type:"number"},
+    {label:"Antall runder", id:"rcount", placeholder:"F.eks. 10", type:"number"}
+  ], (vals)=>{
+    const n = parseInt(vals.rcount)||0;
+    const text = (vals.rtext||"").trim();
+    const seq = (vals.rseq||"").trim();
+    const res = parsePattern(seq);
+    for(let i=0;i<n;i++){
+      if(res) p.rounds.push({id:uid(), text, seq, steps:res.steps, rep:res.rep, repSize:res.repSize, total:res.total, target:res.total});
+      else p.rounds.push({id:uid(), text, target:parseInt(vals.rtarget)||0});
+    }
+    save(); render();
+  });
+}
+
+/* ---------- Modal ---------- */
+function modal(title, fields, onOk){
+  const bg = el(`<div class="modal-bg"><div class="modal"><h2></h2></div></div>`);
+  const box = bg.querySelector(".modal");
+  box.querySelector("h2").textContent = title;
+  const inputs={};
+  fields.forEach(f=>{
+    const lab = el(`<label></label>`); lab.textContent=f.label;
+    const inp = el(`<input>`);
+    inp.type = f.type||"text";
+    if(f.type==="number") inp.inputMode="numeric";
+    if(f.placeholder) inp.placeholder=f.placeholder;
+    box.appendChild(lab); box.appendChild(inp);
+    inputs[f.id]=inp;
+  });
+  const row = el(`<div class="row">
+    <button class="btn ghost cancel">Avbryt</button>
+    <button class="btn ok">Lagre</button>
+  </div>`);
+  row.querySelector(".cancel").onclick=()=>bg.remove();
+  row.querySelector(".ok").onclick=()=>{
+    const vals={}; for(const k in inputs) vals[k]=inputs[k].value;
+    bg.remove(); onOk(vals);
+  };
+  box.appendChild(row);
+  bg.onclick=(e)=>{ if(e.target===bg) bg.remove(); };
+  document.body.appendChild(bg);
+  const first = box.querySelector("input"); if(first) setTimeout(()=>first.focus(),50);
+}
+
+/* ---------- liten DOM-hjelper ---------- */
+function el(html){ const t=document.createElement("template"); t.innerHTML=html.trim(); return t.content.firstChild; }
+
+/* ---------- Service worker (offline) ---------- */
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.register("sw.js").catch(()=>{});
+}
+
+/* start */
+render();
+</script>
+</body>
+</html>

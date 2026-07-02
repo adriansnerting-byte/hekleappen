@@ -1,0 +1,15 @@
+{
+  "name": "Hekle – masketeller",
+  "short_name": "Hekle",
+  "description": "Enkel teller for hekling: hold styr på masker, runder og oppskrift.",
+  "start_url": "index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#fbf6f2",
+  "theme_color": "#c66b7e",
+  "icons": [
+    { "src": "icon-180.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
