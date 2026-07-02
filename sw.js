@@ -1,5 +1,7 @@
-// Enkel service worker: gjør appen tilgjengelig uten nett.
-const CACHE = "hekle-v1";
+// Service worker: appen skal virke offline OG fange opp oppdateringer når du er på nett.
+// Strategi: "nettverk-først" for selve siden (index.html) så du alltid får nyeste versjon
+// når du har nett, med fall-tilbake til hurtiglager offline. Ikoner o.l. hentes fra lager.
+const CACHE = "hekle-v3";
 const ASSETS = [
   "index.html",
   "manifest.json",
@@ -21,8 +23,30 @@ self.addEventListener("activate", (e) => {
 });
 
 self.addEventListener("fetch", (e) => {
-  if (e.request.method !== "GET") return;
+  const req = e.request;
+  if (req.method !== "GET") return;
+
+  const isPage = req.mode === "navigate" ||
+    (req.headers.get("accept") || "").includes("text/html");
+
+  if (isPage) {
+    // Nettverk-først: hent nyeste, oppdater lager, fall tilbake til lager offline.
+    e.respondWith(
+      fetch(req).then((res) => {
+        const copy = res.clone();
+        caches.open(CACHE).then((c) => c.put("index.html", copy));
+        return res;
+      }).catch(() => caches.match("index.html"))
+    );
+    return;
+  }
+
+  // Andre filer (ikoner, manifest): lager-først, med nett som reserve.
   e.respondWith(
-    caches.match(e.request).then((hit) => hit || fetch(e.request).catch(() => caches.match("index.html")))
+    caches.match(req).then((hit) => hit || fetch(req).then((res) => {
+      const copy = res.clone();
+      caches.open(CACHE).then((c) => c.put(req, copy));
+      return res;
+    }))
   );
 });
