@@ -8,7 +8,20 @@ også uten nett.
 - **Nytt prosjekt** – lag ett prosjekt per plagg (f.eks. «Amigurumi-katt»).
 - **Legg inn oppskriften** – trykk blyant-ikonet (✎). Skriv én linje per runde.
 
-### To måter å legge inn en runde på
+### Lim inn hele oppskriften på én gang
+Trykk **«📋 Lim inn hele oppskriften»** i redigering, og lim inn hele oppskriften
+med én runde per linje. Appen lager alle rundene automatisk. Den forstår:
+- Runde-etiketter: `R1:`, `Runde 3`, `Rad 5` – og områder som `R4-8` (lager 5 runder)
+- Maskeantall i parentes: `R2: 6 øk (12)`
+- «fm i hver maske»-runder – antallet arves fra runden før
+```
+R1: 6 fm i magisk ring
+R2: 6 øk (12)
+R3: *1 fm, øk* x6 (18)
+R4-8: 1 fm i hver maske
+```
+
+### To måter å legge inn én runde på
 1. **Steg-for-steg (anbefalt)** – skriv mønsteret i «Steg-for-steg»-feltet, så viser
    telleren stort *hva neste maske skal være*: en vanlig **FM**, eller en **ØK**
    (2 fm i samme maske). Skjermen blir farget ved økning/felling.
