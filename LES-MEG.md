@@ -35,8 +35,18 @@ Trykk **«📄 Last opp PDF med oppskrift»** og velg en PDF. Appen henter ut te
 (rett i nettleseren – ingenting sendes ut) og fyller den inn i lim-inn-feltet, klar
 til gjennomsyn og redigering før du legger den til.
 - Virker på **tekst-baserte** PDF-er (de fleste kjøpte/nedlastede mønstre).
-- Virker **ikke** på innskannede bilder av et mønster (det krever tekstgjenkjenning).
+- For innskannede bilde-PDF-er: bruk «Les mønster fra bilde» under.
 - Sjekk alltid forhåndsvisningen – PDF-oppsett kan gi rare linjeskift du kan rette.
+
+### Lese mønster fra bilde (OCR)
+Har du et **bilde** eller skjermbilde av et mønster? Trykk **«🖼️ Les mønster fra
+bilde (OCR)»** og velg bildet. Appen kjenner igjen teksten (norsk) rett på enheten.
+- Første gang lastes gjenkjenningen ned (~18 MB), deretter virker det **offline**.
+- Best på skarpe, rette bilder i godt lys. Skygger/skjev vinkel gir dårligere treff.
+- **Tips (ofte best på iPhone):** åpne bildet i Bilder-appen, hold på teksten,
+  «Marker alt» → «Kopier», og bruk **«📋 Lim inn hele oppskriften»** i stedet.
+  iPhonens egen tekstgjenkjenning er svært god.
+- Sjekk alltid forhåndsvisningen (særlig ø/å) og rett før du legger til.
 
 ### To måter å legge inn én runde på
 1. **Steg-for-steg (anbefalt)** – skriv mønsteret i «Steg-for-steg»-feltet, så viser

@@ -695,9 +695,13 @@ function renderEditor(app){
   pasteBtn.onclick = ()=>pastePatternModal(p);
   app.appendChild(pasteBtn);
 
-  const pdfBtn = el(`<button class="btn ghost" style="margin-bottom:14px">📄 Last opp PDF med oppskrift</button>`);
+  const pdfBtn = el(`<button class="btn ghost" style="margin-bottom:10px">📄 Last opp PDF med oppskrift</button>`);
   pdfBtn.onclick = ()=>importPdf(p);
   app.appendChild(pdfBtn);
+
+  const ocrBtn = el(`<button class="btn ghost" style="margin-bottom:14px">🖼️ Les mønster fra bilde (OCR)</button>`);
+  ocrBtn.onclick = ()=>importImageOcr(p);
+  app.appendChild(ocrBtn);
 
   p.rounds.forEach((r, i)=>{
     const row = el(`<div class="editrow">
@@ -830,6 +834,84 @@ function importPdf(p){
     }catch(e){
       busy.remove();
       alert("Klarte ikke å lese PDF-en: " + (e.message||e));
+    }
+  };
+  inp.click();
+}
+
+/* ---------- OCR: les mønster fra bilde (Tesseract.js, lastes ved bruk) ---------- */
+function loadScript(src){
+  return new Promise((resolve, reject)=>{
+    if(document.querySelector('script[data-src="'+src+'"]')) return resolve();
+    const s = document.createElement("script");
+    s.src = src; s.dataset.src = src;
+    s.onload = resolve; s.onerror = ()=>reject(new Error("Kunne ikke laste "+src));
+    document.head.appendChild(s);
+  });
+}
+// Skaler ned + gråtone/kontrast for bedre gjenkjenning.
+async function fileToCanvas(file, maxDim){
+  const img = new Image();
+  img.src = URL.createObjectURL(file);
+  await img.decode();
+  let w = img.naturalWidth, h = img.naturalHeight;
+  const scale = Math.min(1, maxDim/Math.max(w, h));
+  w = Math.round(w*scale); h = Math.round(h*scale);
+  const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+  const ctx = cv.getContext("2d");
+  ctx.drawImage(img, 0, 0, w, h);
+  URL.revokeObjectURL(img.src);
+  const im = ctx.getImageData(0, 0, w, h), d = im.data;
+  for(let i=0;i<d.length;i+=4){
+    let g = 0.3*d[i] + 0.59*d[i+1] + 0.11*d[i+2];
+    g = (g-128)*1.35 + 128;                       // litt mer kontrast
+    g = g<0?0:g>255?255:g;
+    d[i]=d[i+1]=d[i+2]=g;
+  }
+  ctx.putImageData(im, 0, 0);
+  return cv;
+}
+async function ocrImage(source, onProgress){
+  await loadScript("vendor/tesseract/tesseract.min.js");
+  // Absolutte URL-er kreves fordi worker-en laster filene via importScripts.
+  const abs = (rel)=> new URL(rel, location.href).href;
+  const worker = await Tesseract.createWorker("nor", 1, {
+    workerPath: abs("vendor/tesseract/worker.min.js"),
+    corePath:   abs("vendor/tesseract/"),
+    langPath:   abs("vendor/tesseract/lang"),
+    workerBlobURL: false,
+    logger: (m)=>{ if(m.status==="recognizing text" && onProgress) onProgress(m.progress); }
+  });
+  try {
+    const { data:{ text } } = await worker.recognize(source);
+    return text;
+  } finally {
+    await worker.terminate();
+  }
+}
+function importImageOcr(p){
+  const inp = document.createElement("input");
+  inp.type = "file"; inp.accept = "image/*";
+  inp.onchange = async ()=>{
+    const file = inp.files && inp.files[0];
+    if(!file) return;
+    const busy = el(`<div class="modal-bg"><div class="modal"><h2>Leser tekst fra bilde …</h2>
+      <div class="pastePrev filled">Første gang lastes gjenkjenningen ned (kan ta litt).<br>
+      Fremdrift: <span class="ocrp">starter …</span></div></div></div>`);
+    document.body.appendChild(busy);
+    const pctEl = busy.querySelector(".ocrp");
+    try{
+      const canvas = await fileToCanvas(file, 2200);
+      const text = await ocrImage(canvas, (fr)=>{ pctEl.textContent = Math.round(fr*100)+" %"; });
+      busy.remove();
+      if(!text.trim()){
+        alert("Fant ingen tekst i bildet. Prøv et skarpere og rettere bilde, i godt lys.");
+        return;
+      }
+      pastePatternModal(p, text);
+    }catch(e){
+      busy.remove();
+      alert("Klarte ikke å lese bildet: " + (e.message||e));
     }
   };
   inp.click();
