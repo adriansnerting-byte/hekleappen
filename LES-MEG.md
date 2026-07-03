@@ -30,6 +30,14 @@ Runde 3 (rød): Fm, 2 fm (øke). Repeter 6 ganger. Til sammen 18 fm.
 Runde 4-8 (rød): Fm hele veien rundt. Til sammen 18 fm.
 ```
 
+### Laste opp PDF med oppskrift
+Trykk **«📄 Last opp PDF med oppskrift»** og velg en PDF. Appen henter ut teksten
+(rett i nettleseren – ingenting sendes ut) og fyller den inn i lim-inn-feltet, klar
+til gjennomsyn og redigering før du legger den til.
+- Virker på **tekst-baserte** PDF-er (de fleste kjøpte/nedlastede mønstre).
+- Virker **ikke** på innskannede bilder av et mønster (det krever tekstgjenkjenning).
+- Sjekk alltid forhåndsvisningen – PDF-oppsett kan gi rare linjeskift du kan rette.
+
 ### To måter å legge inn én runde på
 1. **Steg-for-steg (anbefalt)** – skriv mønsteret i «Steg-for-steg»-feltet, så viser
    telleren stort *hva neste maske skal være*: en vanlig **FM**, eller en **ØK**

@@ -137,8 +137,34 @@
 <body>
 <div id="app"></div>
 
+<script src="vendor/pdf.min.js"></script>
 <script>
 "use strict";
+
+/* PDF-bibliotek: sett worker-fil (lokal, virker offline) */
+if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = "vendor/pdf.worker.min.js";
+
+// Trekk ut tekst fra en PDF (ArrayBuffer), linje for linje etter posisjon.
+async function extractPdfText(buf){
+  if(!window.pdfjsLib) throw new Error("PDF-bibliotek ikke lastet");
+  const pdf = await pdfjsLib.getDocument({data: buf}).promise;
+  const out = [];
+  for(let n=1; n<=pdf.numPages; n++){
+    const page = await pdf.getPage(n);
+    const tc = await page.getTextContent();
+    const lines = {};
+    for(const it of tc.items){
+      if(!it.str) continue;
+      const y = Math.round(it.transform[5]);            // vertikal posisjon
+      (lines[y] = lines[y] || []).push({x: it.transform[4], s: it.str});
+    }
+    Object.keys(lines).map(Number).sort((a,b)=>b-a).forEach(y=>{
+      const line = lines[y].sort((a,b)=>a.x-b.x).map(o=>o.s).join("").replace(/\s+/g," ").trim();
+      if(line) out.push(line);
+    });
+  }
+  return out.join("\n");
+}
 
 /* ---------- Lagring ---------- */
 const KEY = "hekleapp.v1";
@@ -230,7 +256,7 @@ function parseSeq(s){
       continue;
     }
     // "2 fm (øke)" / "fm (øk)" = én økning, ikke to fastmasker
-    if(/øk|øke/i.test(part) && /fm/i.test(part)){ steps.push(STITCH_BASE.ok); continue; }
+    if(/øk|øke|\boke/i.test(part) && /fm/i.test(part)){ steps.push(STITCH_BASE.ok); continue; }
     const m = part.match(/^(\d+)?\s*x?\s*(.+)$/);
     if(!m) continue;
     const cnt = m[1]?parseInt(m[1]):1;
@@ -287,8 +313,8 @@ function describeSteps(steps){
 function segStitch(seg){
   const s = seg.toLowerCase();
   if(!/[a-zæøå]/.test(s)) return null;
-  if(/øk|øke|øker|økning/.test(s)){
-    const om = s.match(/(\d+)\s*øk/);            // "6 øk" = 6 økninger, "2 fm (øke)" = 1
+  if(/øk|øke|økning|\boke|\boking/.test(s)){     // også "oke" (PDF som mister ø)
+    const om = s.match(/(\d+)\s*(?:øk|oke)/);     // "6 øk" = 6 økninger, "2 fm (øke)" = 1
     return { st: STITCH_BASE.ok, n: om ? parseInt(om[1]) : 1 };
   }
   if(/fell|felling|sammen|smk/.test(s)){
@@ -342,7 +368,7 @@ function parseRoundLine(raw, carry){
   // 5. Isoler selve maske-instruksjonen (før "repeter/til sammen/skal ha")
   let instr = line.split(/\b(?:repeter|repeater|gjenta|gjentas|til\s*sammen|tilsammen|denne skal|skal ha)\b/i)[0].trim();
   const low = instr.toLowerCase();
-  const incCue = /(øk|øke|øker|økning)/.test(low) || /2\s*fm/.test(low);
+  const incCue = /(øk|øke|økning|\boke|\boking)/.test(low) || /2\s*fm/.test(low);
   const fillCue = /(hele veien|rundt hele|hele omgangen|hver maske|\brundt\b)/.test(low);
 
   let steps = [], base = [], reps = 0;
@@ -665,9 +691,13 @@ function renderEditor(app){
     Vil du bare telle uten steg-visning? La feltet stå tomt og skriv <b>maskemål</b> selv.
   </div>`));
 
-  const pasteBtn = el(`<button class="btn ghost" style="margin-bottom:14px">📋 Lim inn hele oppskriften</button>`);
+  const pasteBtn = el(`<button class="btn ghost" style="margin-bottom:10px">📋 Lim inn hele oppskriften</button>`);
   pasteBtn.onclick = ()=>pastePatternModal(p);
   app.appendChild(pasteBtn);
+
+  const pdfBtn = el(`<button class="btn ghost" style="margin-bottom:14px">📄 Last opp PDF med oppskrift</button>`);
+  pdfBtn.onclick = ()=>importPdf(p);
+  app.appendChild(pdfBtn);
 
   p.rounds.forEach((r, i)=>{
     const row = el(`<div class="editrow">
@@ -727,7 +757,7 @@ function renderEditor(app){
   app.appendChild(addRep);
 }
 
-function pastePatternModal(p){
+function pastePatternModal(p, initialText){
   const bg = el(`<div class="modal-bg"><div class="modal">
     <h2>Lim inn oppskrift</h2>
     <label>Lim inn hele oppskriften – én runde per linje</label>
@@ -774,7 +804,35 @@ function pastePatternModal(p){
   };
   bg.onclick = (e)=>{ if(e.target===bg) bg.remove(); };
   document.body.appendChild(bg);
+  if(initialText){ ta.value = initialText; refresh(); }
   setTimeout(()=>ta.focus(), 50);
+}
+
+// Velg PDF → trekk ut tekst → åpne lim-inn-modalen forhåndsutfylt.
+function importPdf(p){
+  const inp = document.createElement("input");
+  inp.type = "file"; inp.accept = "application/pdf,.pdf";
+  inp.onchange = async ()=>{
+    const file = inp.files && inp.files[0];
+    if(!file) return;
+    const busy = el(`<div class="modal-bg"><div class="modal"><h2>Leser PDF …</h2>
+      <div class="pastePrev filled">Henter ut tekst fra «${(file.name||"").replace(/[<>&]/g,"")}» …</div></div></div>`);
+    document.body.appendChild(busy);
+    try{
+      const buf = await file.arrayBuffer();
+      const text = await extractPdfText(buf);
+      busy.remove();
+      if(!text.trim()){
+        alert("Fant ingen tekst i PDF-en. Er den kanskje et innskannet bilde? Da må teksten skrives inn manuelt.");
+        return;
+      }
+      pastePatternModal(p, text);
+    }catch(e){
+      busy.remove();
+      alert("Klarte ikke å lese PDF-en: " + (e.message||e));
+    }
+  };
+  inp.click();
 }
 
 function repeatModal(p){

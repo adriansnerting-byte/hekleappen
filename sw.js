@@ -1,13 +1,15 @@
 // Service worker: appen skal virke offline OG fange opp oppdateringer når du er på nett.
 // Strategi: "nettverk-først" for selve siden (index.html) så du alltid får nyeste versjon
 // når du har nett, med fall-tilbake til hurtiglager offline. Ikoner o.l. hentes fra lager.
-const CACHE = "hekle-v3";
+const CACHE = "hekle-v4";
 const ASSETS = [
   "index.html",
   "manifest.json",
   "icon-180.png",
   "icon-192.png",
-  "icon-512.png"
+  "icon-512.png",
+  "vendor/pdf.min.js",
+  "vendor/pdf.worker.min.js"
 ];
 
 self.addEventListener("install", (e) => {
